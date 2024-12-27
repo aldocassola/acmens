@@ -18,12 +18,12 @@ with open(path.join(here, "README.md"), encoding="utf-8") as f:
 config = {
     "name": "acmens",
     "version": __version__,
-    "description": "An ACMEv2 client. Fork of acme-nosudo.",
+    "description": "An ACMEv2 client. Fork of github.com/r5d/acmens.",
     "long_description": long_description,
     "long_description_content_type": "text/markdown",
-    "url": "https://github.com/r5d/acmens",
-    "author": "siddharth ravikumar",
-    "author_email": "s@ricketyspace.net",
+    "url": "https://github.com/aldocassola/acmens",
+    "author": "Aldo Cassola",
+    "author_email": "aldocassola@gmail.com",
     "license": "GNU Affero General Public License v3",
     "classifiers": [
         "Development Status :: 2 - Pre-Alpha",

@@ -1,10 +1,12 @@
-# acmens
+# acmensse
 
-A fork of [acme-nosudo][]. It uses ACMEv2 protocol and requires Python 3.
+ACME nosudo/secretenv is fork of [acmens][] that supports environment variable secrets
+through openssl's `-passin env:VAR` idiom.
+It uses ACMEv2 protocol and requires Python 3.
 
-[acme-nosudo]: https://github.com/diafygi/acme-nosudo
+[acmens]: https://github.com/r5d/acmens
 
-`acmens` may be used for getting a new SSL certificate, renewing a SSL
+`acmensse` may be used for getting a new SSL certificate, renewing a SSL
 certificate for a domain, and revoking a certificate for a domain.
 
 It's meant to be run locally from your computer.
@@ -19,7 +21,7 @@ It's meant to be run locally from your computer.
 ## installation
 
 ```sh
-pip install acmens
+pip install git@github.com:aldocassola/acmens
 ```
 
 Or, if you would like to use the repo version:

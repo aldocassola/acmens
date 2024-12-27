@@ -21,7 +21,7 @@ from urllib.request import urlopen
 from urllib.error import URLError
 
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 CA_PRD = "https://acme-v02.api.letsencrypt.org"
 CA_STG = "https://acme-staging-v02.api.letsencrypt.org"
@@ -62,7 +62,7 @@ def _do_request(url, data=None, err_msg="Error"):
                 data=data,
                 headers={
                     "Content-Type": "application/jose+json",
-                    "User-Agent": "acmens",
+                    "User-Agent": "com.aldocassola.acmensse",
                 },
             )
         )
@@ -92,7 +92,7 @@ def _mk_signed_req_body(url, payload, nonce, auth, account_key):
     protected64 = _b64(json.dumps(protected).encode("utf8"))
     protected_input = "{0}.{1}".format(protected64, payload64).encode("utf8")
     out = _cmd(
-        ["openssl", "dgst", "-sha256", "-sign", account_key],
+        ["openssl", "dgst", "-sha256", "-sign", account_key, "-passin", "env:ACMEPASS"],
         stdin=subprocess.PIPE,
         cmd_input=protected_input,
         err_msg="OpenSSL Error",
@@ -281,7 +281,7 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
     out = _cmd(
-        ["openssl", "rsa", "-in", account_key, "-noout", "-text"],
+        ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"],
         err_msg="Error reading account public key",
     )
     pub_hex, pub_exp = re.search(
@@ -451,7 +451,7 @@ def revoke_crt(ca_url, account_key, crt):
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
     out = _cmd(
-        ["openssl", "rsa", "-in", account_key, "-noout", "-text"],
+        ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"],
         err_msg="Error reading account public key",
     )
 
