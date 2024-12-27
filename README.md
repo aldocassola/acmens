@@ -21,7 +21,7 @@ It's meant to be run locally from your computer.
 ## installation
 
 ```sh
-pip install git@github.com:aldocassola/acmens
+pip install git+ssh@github.com:aldocassola/acmens
 ```
 
 Or, if you would like to use the repo version:
@@ -46,8 +46,8 @@ make develop
 First, generate an user account key for Let's Encrypt:
 
 ```sh
-openssl genrsa -aes256 4096 > user.key
-openssl rsa -in user.key -pubout > user.pub
+openssl genrsa -aes256 4096 -out user.key
+openssl rsa -in user.key -pubout -out user.pub
 ```
 
 Next, generate the domain key and a certificate request:
@@ -60,20 +60,20 @@ openssl genrsa -aes256 -out domain.key 4096
 openssl req -new -sha256 -key domain.key -out domain.csr
 
 # Or Generate CSR for multiple domains
-openssl req -new -sha256 -key domain.key -subj "/" -addext "subjectAltName = DNS:example.com, DNS:www.example.com" > domain.csr
+openssl req -new -sha256 -key domain.key -subj "/" -addext "subjectAltName = DNS:example.com, DNS:www.example.com" -out domain.csr
 ```
 
 Lastly, run `acmens`:
 
 ```sh
-acmens --account-key user.key --email mail@example.com --csr domain.csr > signed.crt
+ACMEPASS=$YOURUSERKEYPASSPHRASE acmens --account-key user.key --email mail@example.com --csr domain.csr -out signed.crt
 ```
 ## dns challenge
 
 If you want to use the DNS challenge type provide it using the `--challenge` flag.
 
 ```sh
-acmens --account-key user.key --email mail@example.com --challenge dns --csr domain.csr > signed.crt
+acmens --account-key user.key --email mail@example.com --challenge dns --csr domain.csr -out signed.crt
 ```
 
 This will prompt you to update the DNS records to add a TXT record.

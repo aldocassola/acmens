@@ -4,6 +4,7 @@
 #
 # Copyright © 2015-2018 Daniel Roesler <diafygi@gmail.com>
 # Copyright © 2021-2022 siddharth ravikumar <s@ricketyspace.net>
+# Copyright © 2023-2024 Aldo Cassola <aldocassola@gmail.com>
 #
 
 import argparse
@@ -289,7 +290,7 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
         out.decode("utf8"),
         re.MULTILINE | re.DOTALL,
     ).groups()
-    pub_mod = binascii.unhexlify(re.sub("(\s|:)", "", pub_hex))
+    pub_mod = binascii.unhexlify(re.sub(r"(\s|:)", "", pub_hex))
     pub_mod64 = _b64(pub_mod)
     pub_exp = int(pub_exp)
     pub_exp = "{0:x}".format(pub_exp)
@@ -313,7 +314,7 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
     )
     domains = set([])
     cn = None
-    common_name = re.search("Subject:.*? CN *= *([^\s,;/]+)", out.decode("utf8"))
+    common_name = re.search(r"Subject:.*? CN *= *([^\s,;/]+)", out.decode("utf8"))
     if common_name is not None:
         domains.add(common_name.group(1))
         cn = common_name.group(1)
@@ -460,7 +461,7 @@ def revoke_crt(ca_url, account_key, crt):
         out.decode("utf8"),
         re.MULTILINE | re.DOTALL,
     ).groups()
-    pub_mod = binascii.unhexlify(re.sub("(\s|:)", "", pub_hex))
+    pub_mod = binascii.unhexlify(re.sub(r"(\s|:)", "", pub_hex))
     pub_mod64 = _b64(pub_mod)
     pub_exp = int(pub_exp)
     pub_exp = "{0:x}".format(pub_exp)
