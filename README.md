@@ -63,17 +63,17 @@ openssl req -new -sha256 -key domain.key -out domain.csr
 openssl req -new -sha256 -key domain.key -subj "/" -addext "subjectAltName = DNS:example.com, DNS:www.example.com" -out domain.csr
 ```
 
-Lastly, run `acmens`:
+Lastly, run `acmensse`:
 
 ```sh
-ACMEPASS=$YOURUSERKEYPASSPHRASE acmens --account-key user.key --email mail@example.com --csr domain.csr -out signed.crt
+ACMEPASS=$YOURUSERKEYPASSPHRASE acmensse --account-key user.key --email mail@example.com --csr domain.csr -out signed.crt
 ```
 ## dns challenge
 
 If you want to use the DNS challenge type provide it using the `--challenge` flag.
 
 ```sh
-acmens --account-key user.key --email mail@example.com --challenge dns --csr domain.csr -out signed.crt
+acmensse--account-key user.key --email mail@example.com --challenge dns --csr domain.csr -out signed.crt
 ```
 
 This will prompt you to update the DNS records to add a TXT record.
@@ -83,7 +83,7 @@ This will prompt you to update the DNS records to add a TXT record.
 This:
 
 ```sh
-acmens --revoke -k user.key --crt signed.crt
+acmensse --revoke -k user.key --crt signed.crt
 ```
 
 will revoke SSL certificate in `signed.crt`.
