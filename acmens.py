@@ -17,6 +17,7 @@ import binascii
 import time
 import hashlib
 import re
+from os import path, getcwd
 
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -92,8 +93,9 @@ def _mk_signed_req_body(url, payload, nonce, auth, account_key):
     protected.update(auth)
     protected64 = _b64(json.dumps(protected).encode("utf8"))
     protected_input = "{0}.{1}".format(protected64, payload64).encode("utf8")
+    cmd = ["openssl", "dgst", "-sha256", "-sign", account_key, "-passin", "env:ACMEPASS"]
     out = _cmd(
-        ["openssl", "dgst", "-sha256", "-sign", account_key, "-passin", "env:ACMEPASS"],
+        cmd,
         stdin=subprocess.PIPE,
         cmd_input=protected_input,
         err_msg="OpenSSL Error",
@@ -281,8 +283,9 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
 
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
+    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"]
     out = _cmd(
-        ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"],
+        cmd,
         err_msg="Error reading account public key",
     )
     pub_hex, pub_exp = re.search(
@@ -451,8 +454,9 @@ def revoke_crt(ca_url, account_key, crt):
 
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
+    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"]
     out = _cmd(
-        ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"],
+        cmd,
         err_msg="Error reading account public key",
     )
 
@@ -513,7 +517,7 @@ def revoke_crt(ca_url, account_key, crt):
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="""acmens may be used for getting a new SSL certificate, renewing a
+        description="""acmensse may be used for getting a new SSL certificate, renewing a
 SSL certificate for a domain, and revoking a certificate for a domain.
 
 It's meant to be run locally from your computer.""",
@@ -544,6 +548,7 @@ It's meant to be run locally from your computer.""",
     )
     parser.add_argument("--csr", help="path to your certificate signing request")
     parser.add_argument("--crt", help="path to your signed certificate")
+    parser.add_argument("-o", "--out", default=None, help="output file name, default is stdout")
 
     args = parser.parse_args()
     if args.version:
@@ -565,12 +570,19 @@ It's meant to be run locally from your computer.""",
 
     if args.revoke:
         revoke_crt(ca_url, args.account_key, args.crt)
-    else:
-        signed_crt = sign_csr(
-            ca_url,
-            args.account_key,
-            args.csr,
-            email=args.email,
-            challenge_type=args.challenge,
-        )
+        sys.exit(0)
+
+    signed_crt = sign_csr(
+        ca_url,
+        args.account_key,
+        args.csr,
+        email=args.email,
+        challenge_type=args.challenge,
+    )
+
+    if not args.out:
         sys.stdout.write(signed_crt)
+        sys.exit(0)
+
+    with open(path.join(getcwd(), args.out), encoding='ascii') as out:
+        out.write(signed_crt)
