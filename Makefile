@@ -7,28 +7,28 @@ VENV_DIR=.venv
 VENV=virtualenv
 
 fmt:
-	black acmens.py setup.py
+	black acmensse.py setup.py
 .PHONY: fmt
 
 venv:
 	test -d ${VENV_DIR} || ${VENV} --python=python3 ${VENV_DIR}
 .PHONY: venv
 
-develop:
-	@python3 setup.py develop
+editable:
+	@python3 -m pip install --editable .
 	@pip install -U pip black twine
-.PHONY: develop
+.PHONY: editable
 
 build:
-	@python3 setup.py sdist bdist_wheel
+	@python3 -m build
 .PHONY: build
 
 upload:
-	@twine upload -r acmens -s -i \
-		'1534 126D 8C8E AD29 EDD9  1396 6BE9 3D8B F866 4377' \
+	@python3 -m twine upload -r acmensse -s -i \
+		'6EF4 5AA3 7C1F F642 5620 B7E2 8545 3F6B 2786 0675' \
 		dist/*.tar.gz
-	@twine upload -r acmens -s -i \
-		'1534 126D 8C8E AD29 EDD9  1396 6BE9 3D8B F866 4377' \
+	@python3 -m twine upload -r acmensse -s -i \
+		'6EF4 5AA3 7C1F F642 5620 B7E2 8545 3F6B 2786 0675' \
 		dist/*.whl
 .PHONY: upload
 
