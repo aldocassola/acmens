@@ -9,14 +9,14 @@ from setuptools import setup
 from codecs import open
 from os import path
 
-from acmens import __version__
+from acmensse import __version__
 
 here = path.abspath(path.dirname(__file__))
 with open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 config = {
-    "name": "acmens",
+    "name": "acmensse",
     "version": __version__,
     "description": "An ACMEv2 client. Fork of github.com/r5d/acmens.",
     "long_description": long_description,
@@ -38,9 +38,9 @@ config = {
         "Topic :: System :: Systems Administration",
         "Topic :: Utilities",
     ],
-    "keywords": "acme letsencrypt acmens",
-    "py_modules": ["acmens"],
+    "keywords": "acme letsencrypt acmensse",
+    "py_modules": ["acmensse"],
     "python_requires": ">=3",
-    "entry_points": {"console_scripts": ["acmens = acmens:main"]},
+    "entry_points": {"console_scripts": ["acmensse = acmensse:main"]},
 }
 setup(**config)
