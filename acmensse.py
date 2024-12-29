@@ -322,14 +322,14 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
         domains.add(common_name.group(1))
         cn = common_name.group(1)
     subj_alt_names = re.search(
-        "X509v3 Subject Alternative Name: \n +([^\n]+)\n",
+        "X509v3 Subject Alternative Name:\\s*\n\\s+([^\n]+)\n",
         out.decode("utf8"),
         re.MULTILINE | re.DOTALL,
     )
     if subj_alt_names is not None:
         for san in subj_alt_names.group(1).split(", "):
             if san.startswith("DNS:"):
-                dm = san[4:]
+                dm = san[4:].strip()
                 if cn is None and dm.find("*") == -1:
                     cn = dm
                 domains.add(dm)
@@ -348,7 +348,7 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
 
     # Step 4: Generate the payload for registering user and initiate registration.
     sys.stderr.write("Registering {0}...\n".format(email))
-    _agree_to(_directory(ca_url)["meta"]["termsOfService"])
+    # _agree_to(_directory(ca_url)["meta"]["termsOfService"])
     reg = {"termsOfServiceAgreed": True}
     nonce_url = _directory(ca_url)["newNonce"]
     auth = {"jwk": jwk}
