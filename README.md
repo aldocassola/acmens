@@ -46,7 +46,7 @@ make develop
 First, generate an user account key for Let's Encrypt:
 
 ```sh
-openssl genrsa -aes256 4096 -out user.key
+openssl genrsa -aes256 -out user.key 4096
 openssl rsa -in user.key -pubout -out user.pub
 ```
 
@@ -66,7 +66,7 @@ openssl req -new -sha256 -key domain.key -subj "/" -addext "subjectAltName = DNS
 Lastly, run `acmensse`:
 
 ```sh
-ACMEPASS=$YOURUSERKEYPASSPHRASE acmensse --account-key user.key --email mail@example.com --csr domain.csr -out signed.crt
+ACMEPASS=$YOURUSERKEYPASSPHRASE acmensse --account-key user.key --email mail@example.com --csr domain.csr --out signed.crt
 ```
 ## dns challenge
 

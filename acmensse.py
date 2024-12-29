@@ -584,5 +584,5 @@ It's meant to be run locally from your computer.""",
         sys.stdout.write(signed_crt)
         sys.exit(0)
 
-    with open(path.join(getcwd(), args.out), encoding='ascii') as out:
+    with open(path.join(getcwd(), args.out), mode='w', encoding='ascii') as out:
         out.write(signed_crt)
