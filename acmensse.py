@@ -17,7 +17,7 @@ import binascii
 import time
 import hashlib
 import re
-from os import path, getcwd
+from os import path, getcwd, environ
 
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -93,7 +93,10 @@ def _mk_signed_req_body(url, payload, nonce, auth, account_key):
     protected.update(auth)
     protected64 = _b64(json.dumps(protected).encode("utf8"))
     protected_input = "{0}.{1}".format(protected64, payload64).encode("utf8")
-    cmd = ["openssl", "dgst", "-sha256", "-sign", account_key, "-passin", "env:ACMEPASS"]
+    cmd = ["openssl", "dgst", "-sha256", "-sign", account_key]
+    if environ.get("ACMEPASS"):
+        cmd.extend(["-passin", "env:ACMEPASS"])
+
     out = _cmd(
         cmd,
         stdin=subprocess.PIPE,
@@ -283,7 +286,9 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
 
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
-    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"]
+    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text"]
+    if environ.get("ACMEPASS"):
+        cmd.extend(["-passin", "env:ACMEPASS"])
     out = _cmd(
         cmd,
         err_msg="Error reading account public key",
@@ -454,7 +459,10 @@ def revoke_crt(ca_url, account_key, crt):
 
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
-    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text", "-passin", "env:ACMEPASS"]
+    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text"]
+    if environ.get("ACMEPASS"):
+        cmd.extend(["-passin", "env:ACMEPASS"])
+
     out = _cmd(
         cmd,
         err_msg="Error reading account public key",
