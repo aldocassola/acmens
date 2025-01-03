@@ -17,7 +17,8 @@ import binascii
 import time
 import hashlib
 import re
-from os import path, getcwd, environ
+from os import path, getcwd, environ, path
+from configparser import ConfigParser
 
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -29,6 +30,7 @@ CA_PRD = "https://acme-v02.api.letsencrypt.org"
 CA_STG = "https://acme-staging-v02.api.letsencrypt.org"
 CA_DIR = None
 
+cfg = ConfigParser()
 
 def _directory(ca_url):
     global CA_DIR
@@ -148,7 +150,7 @@ def _poll_until_not(url, pending_statuses, nonce_url, auth, account_key, err_msg
     return result
 
 
-def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumbprint):
+def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumbprint, unattended=False):
     """Do ACME challenge"""
     # Request challenges
     sys.stderr.write("Requesting challenges...\n")
@@ -157,11 +159,16 @@ def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumb
     )
     domain = chl_result["identifier"]["value"]
 
+    unattended = False
+    if challenge_type == "http-unattended":
+        unattended = True
+
     # Choose challenge.
     preferred_type = "dns-01" if challenge_type == "dns" else "http-01"
     challenge = None
     dns_challenge = None
     http_challenge = None
+    sys.stderr.write(str(chl_result) + "\n")
     for c in chl_result["challenges"]:
         if c["type"] == preferred_type:
             challenge = c
@@ -173,7 +180,7 @@ def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumb
         if http_challenge:
             # Fallback to http challenge.
             challenge = http_challenge
-            challenge_type = "http"
+            challenge_type = "http" if unattended == False else "http-unattended"
         elif dns_challenge:
             # Fallback to dns challenge.
             challenge = dns_challenge
@@ -199,7 +206,14 @@ _acme-challenge    IN    TXT ( \"{keyauth}\" )
             )
         )
         final_msg = "You can remove the _acme-challenge DNS TXT record now."
-    else:
+    elif challenge_type.startswith("http"):
+        chall_dir = cfg.get('directories', 'challenges')
+        chfilepath = path.join(chall_dir, challenge["token"])
+        with open(chfilepath, mode="w", encoding="utf-8") as chall_file:
+            sys.stderr.write("writing challenge file {}\n".format(chfilepath))
+            chall_file.write(keyauthorization)
+            chall_file.flush()
+
         # Challenge response for http server.
         response_uri = ".well-known/acme-challenge/{0}".format(challenge["token"])
         sys.stderr.write(
@@ -207,6 +221,7 @@ _acme-challenge    IN    TXT ( \"{keyauth}\" )
 Please update your server to serve the following file at this URL:
 
 --------------
+File: {chfile}
 URL: http://{domain}/{uri}
 File contents: \"{token}\"
 --------------
@@ -216,7 +231,7 @@ Notes:
 - The file should be one line without any spaces.
 
 """.format(
-                domain=domain, uri=response_uri, token=keyauthorization
+                chfile=chfilepath, domain=domain, uri=response_uri, token=keyauthorization
             )
         )
         final_msg = "You can remove the acme-challenge file from your webserver now."
@@ -225,8 +240,9 @@ Notes:
     sys.stdout = sys.stderr
     if challenge_type == "dns":
         input("Press Enter when the TXT record is updated on the DNS...")
-    else:
+    elif challenge_type == "http" :
         input("Press Enter when you've got the file hosted on your server...")
+
     sys.stdout = stdout
 
     # Let the CA know you're ready for the challenge
@@ -530,6 +546,7 @@ SSL certificate for a domain, and revoking a certificate for a domain.
 
 It's meant to be run locally from your computer.""",
     )
+    parser.add_argument("--config", help="configuration file", default="acmensse.ini")
     parser.add_argument("--version", action="store_true", help="Show version and exit")
     parser.add_argument(
         "--revoke", action="store_true", help="Revoke a signed certificate"
@@ -552,7 +569,7 @@ It's meant to be run locally from your computer.""",
         "-c",
         "--challenge",
         default="http",
-        help="Challenge type (http or dns), default is http",
+        help="Challenge type (http, http-unattended or dns), default is http",
     )
     parser.add_argument("--csr", help="path to your certificate signing request")
     parser.add_argument("--crt", help="path to your signed certificate")
@@ -571,6 +588,8 @@ It's meant to be run locally from your computer.""",
     if args.revoke and args.crt is None:
         sys.stderr.write("Error: Path to signed cert required\n")
         sys.exit(1)
+
+    cfg.read(args.config)
 
     ca_url = CA_PRD
     if args.stage:
@@ -592,5 +611,5 @@ It's meant to be run locally from your computer.""",
         sys.stdout.write(signed_crt)
         sys.exit(0)
 
-    with open(path.join(getcwd(), args.out), mode='w', encoding='ascii') as out:
+    with open(args.out, mode='w', encoding='ascii') as out:
         out.write(signed_crt)
