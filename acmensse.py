@@ -150,7 +150,7 @@ def _poll_until_not(url, pending_statuses, nonce_url, auth, account_key, err_msg
     return result
 
 
-def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumbprint, unattended=False):
+def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumbprint):
     """Do ACME challenge"""
     # Request challenges
     sys.stderr.write("Requesting challenges...\n")
@@ -158,10 +158,6 @@ def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumb
         authz_url, None, nonce_url, auth, account_key, "Error getting challenges"
     )
     domain = chl_result["identifier"]["value"]
-
-    unattended = False
-    if challenge_type == "http-unattended":
-        unattended = True
 
     # Choose challenge.
     preferred_type = "dns-01" if challenge_type == "dns" else "http-01"
@@ -180,7 +176,7 @@ def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumb
         if http_challenge:
             # Fallback to http challenge.
             challenge = http_challenge
-            challenge_type = "http" if unattended == False else "http-unattended"
+            challenge_type = "http-01" if challenge_type == "dns" else challenge_type
         elif dns_challenge:
             # Fallback to dns challenge.
             challenge = dns_challenge
@@ -573,7 +569,6 @@ It's meant to be run locally from your computer.""",
     )
     parser.add_argument("--csr", help="path to your certificate signing request")
     parser.add_argument("--crt", help="path to your signed certificate")
-    parser.add_argument("-o", "--out", default=None, help="output file name, default is stdout")
 
     args = parser.parse_args()
     if args.version:
@@ -607,9 +602,9 @@ It's meant to be run locally from your computer.""",
         challenge_type=args.challenge,
     )
 
-    if not args.out:
+    if not args.crt:
         sys.stdout.write(signed_crt)
         sys.exit(0)
 
-    with open(args.out, mode='w', encoding='ascii') as out:
+    with open(args.crt, mode='w', encoding='ascii') as out:
         out.write(signed_crt)
