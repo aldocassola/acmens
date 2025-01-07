@@ -164,7 +164,6 @@ def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumb
     challenge = None
     dns_challenge = None
     http_challenge = None
-    sys.stderr.write(str(chl_result) + "\n")
     for c in chl_result["challenges"]:
         if c["type"] == preferred_type:
             challenge = c
@@ -203,12 +202,16 @@ _acme-challenge    IN    TXT ( \"{keyauth}\" )
         )
         final_msg = "You can remove the _acme-challenge DNS TXT record now."
     elif challenge_type.startswith("http"):
-        chall_dir = cfg.get('directories', 'challenges')
-        chfilepath = path.join(chall_dir, challenge["token"])
-        with open(chfilepath, mode="w", encoding="utf-8") as chall_file:
-            sys.stderr.write("writing challenge file {}\n".format(chfilepath))
-            chall_file.write(keyauthorization)
-            chall_file.flush()
+        chfilepath = "(None)"
+        chall_dir = cfg.get('directories', 'challenges_dir')
+        if chall_dir:
+            chfilepath = path.join(chall_dir, challenge["token"])
+            with open(chfilepath, mode="w", encoding="utf-8") as chall_file:
+                sys.stderr.write("writing challenge file {}\n".format(chfilepath))
+                chall_file.write(keyauthorization)
+                chall_file.flush()
+        else:
+            sys.stderr.write("chall_dir unset, skipping challenge file...")
 
         # Challenge response for http server.
         response_uri = ".well-known/acme-challenge/{0}".format(challenge["token"])
