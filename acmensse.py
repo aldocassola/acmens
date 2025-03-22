@@ -19,9 +19,11 @@ import hashlib
 import re
 from os import path, getcwd, environ, path
 from configparser import ConfigParser
+from pathlib import Path
 
 from urllib.request import urlopen
 from urllib.error import URLError
+from getpass import getpass
 
 
 __version__ = "0.3.1"
@@ -31,6 +33,38 @@ CA_STG = "https://acme-staging-v02.api.letsencrypt.org"
 CA_DIR = None
 
 cfg = ConfigParser()
+
+class _account_keyfile:
+    def __init__(self, fpath, getPass):
+        self._keyfilepath = fpath
+        self._passin = ""
+
+        if getPass == True:
+            self._passin = getpass("Enter your key passphrase: ")
+
+    def passopts(self, fd:int):
+        if self._passin == "":
+            return []
+
+        return ["-passin", "fd:{}".format(fd)]
+
+    def passpipe(self):
+        """
+        Return the read end and the closer for the writing end of a pipe
+        that provides the passphrase once.
+
+        r, closeIt = key.passpipe()
+        p = subprocess.Popen(["openssl", ..., "-passin", "fd:{}".format(r)], preexec_fn:closeIt)
+        """
+        import os
+        r, w = os.pipe()
+        os.write(w, self._passin.encode("utf-8"))
+        os.close(w)
+        return r, lambda:os.close(w)
+
+    def __str__(self):
+        return self._keyfilepath
+
 
 def _directory(ca_url):
     global CA_DIR
@@ -46,10 +80,11 @@ def _b64(b):
     return base64.urlsafe_b64encode(b).decode().replace("=", "")
 
 
-def _cmd(cmd_list, stdin=None, cmd_input=None, err_msg="Command Line Error"):
+def _cmd(cmd_list, stdin=None, cmd_input=None, err_msg="Command Line Error", preexec_fn=None):
     "Runs external commands"
     proc = subprocess.Popen(
-        cmd_list, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        cmd_list, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        preexec_fn=preexec_fn
     )
     out, err = proc.communicate(cmd_input)
     if proc.returncode != 0:
@@ -85,7 +120,7 @@ def _do_request(url, data=None, err_msg="Error"):
     return resp_data, code, headers
 
 
-def _mk_signed_req_body(url, payload, nonce, auth, account_key):
+def _mk_signed_req_body(url, payload, nonce, auth, account_key:_account_keyfile):
     if len(nonce) < 1:
         sys.stderr.write("_mk_signed_req_body: nonce invalid: {}".format(nonce))
         sys.exit(1)
@@ -95,15 +130,16 @@ def _mk_signed_req_body(url, payload, nonce, auth, account_key):
     protected.update(auth)
     protected64 = _b64(json.dumps(protected).encode("utf8"))
     protected_input = "{0}.{1}".format(protected64, payload64).encode("utf8")
-    cmd = ["openssl", "dgst", "-sha256", "-sign", account_key]
-    if environ.get("ACMEPASS"):
-        cmd.extend(["-passin", "env:ACMEPASS"])
+    cmd = ["openssl", "dgst", "-sha256", "-sign", str(account_key)]
+    r, closeIt = account_key.passpipe()
+    cmd.extend(account_key.passopts(r))
 
     out = _cmd(
         cmd,
         stdin=subprocess.PIPE,
         cmd_input=protected_input,
         err_msg="OpenSSL Error",
+        preexec_fn=closeIt
     )
     return json.dumps(
         {"protected": protected64, "payload": payload64, "signature": _b64(out)}
@@ -150,7 +186,7 @@ def _poll_until_not(url, pending_statuses, nonce_url, auth, account_key, err_msg
     return result
 
 
-def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumbprint):
+def _do_challenge(challenge_type, authz_url, nonce_url, auth, account_key, thumbprint, unattended):
     """Do ACME challenge"""
     # Request challenges
     sys.stderr.write("Requesting challenges...\n")
@@ -237,7 +273,10 @@ Notes:
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
-    if challenge_type == "dns":
+    if unattended:
+        sys.stderr.write("unattended mode... skipping to verification\n")
+        time.sleep(1)
+    elif challenge_type == "dns":
         input("Press Enter when the TXT record is updated on the DNS...")
     elif challenge_type == "http" :
         input("Press Enter when you've got the file hosted on your server...")
@@ -282,7 +321,7 @@ def _agree_to(terms):
         sys.exit(1)
 
 
-def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
+def sign_csr(ca_url, account_key:_account_keyfile, csr, email=None, challenge_type="http", unattended=False):
     """Use the ACME protocol to get an ssl certificate signed by a
     certificate authority.
 
@@ -301,12 +340,13 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
 
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
-    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text"]
-    if environ.get("ACMEPASS"):
-        cmd.extend(["-passin", "env:ACMEPASS"])
+    cmd = ["openssl", "rsa", "-in", str(account_key), "-noout", "-text"]
+    r, closeIt = account_key.passpipe()
+    cmd.extend(account_key.passopts(r))
     out = _cmd(
         cmd,
         err_msg="Error reading account public key",
+        preexec_fn=closeIt
     )
     pub_hex, pub_exp = re.search(
         r"modulus:[\s]+?00:([a-f0-9\:\s]+?)\npublicExponent: ([0-9]+)",
@@ -412,7 +452,7 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
         "Error creating new order",
     )
     for authz in order["authorizations"]:
-        _do_challenge(challenge_type, authz, nonce_url, auth, account_key, thumbprint)
+        _do_challenge(challenge_type, authz, nonce_url, auth, account_key, thumbprint, unattended)
 
     # Step 8: Finalize
     csr_der = _cmd(
@@ -459,7 +499,7 @@ def sign_csr(ca_url, account_key, csr, email=None, challenge_type="http"):
     return signed_pem
 
 
-def revoke_crt(ca_url, account_key, crt):
+def revoke_crt(ca_url, account_key:_account_keyfile, crt):
     """Use the ACME protocol to revoke an ssl certificate signed by a
     certificate authority.
 
@@ -474,13 +514,14 @@ def revoke_crt(ca_url, account_key, crt):
 
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
-    cmd = ["openssl", "rsa", "-in", account_key, "-noout", "-text"]
-    if environ.get("ACMEPASS"):
-        cmd.extend(["-passin", "env:ACMEPASS"])
+    cmd = ["openssl", "rsa", "-in", str(account_key), "-noout", "-text"]
+    r, closeIt = account_key.passpipe()
+    cmd.extend(account_key.passopts(r))
 
     out = _cmd(
         cmd,
         err_msg="Error reading account public key",
+        preexec_fn=closeIt
     )
 
     pub_hex, pub_exp = re.search(
@@ -572,6 +613,8 @@ It's meant to be run locally from your computer.""",
     )
     parser.add_argument("--csr", help="path to your certificate signing request")
     parser.add_argument("--crt", help="path to your signed certificate")
+    parser.add_argument("--unattended", action="store_true", help="don't wait for user input")
+    parser.add_argument("--passin", action="store_true", help="ask for passphrase")
 
     args = parser.parse_args()
     if args.version:
@@ -586,6 +629,9 @@ It's meant to be run locally from your computer.""",
     if args.revoke and args.crt is None:
         sys.stderr.write("Error: Path to signed cert required\n")
         sys.exit(1)
+    if args.unattended and not args.passin:
+        sys.stderr.write("Error: --unattended requires --passin")
+        sys.exit(1)
 
     cfg.read(args.config)
 
@@ -594,15 +640,18 @@ It's meant to be run locally from your computer.""",
         ca_url = CA_STG
 
     if args.revoke:
-        revoke_crt(ca_url, args.account_key, args.crt)
+        revoke_crt(ca_url,
+            _account_keyfile(args.account_key, args.passin),
+            args.crt)
         sys.exit(0)
 
     signed_crt = sign_csr(
         ca_url,
-        args.account_key,
+        _account_keyfile(args.account_key, args.passin),
         args.csr,
         email=args.email,
         challenge_type=args.challenge,
+        unattended=args.unattended
     )
 
     if not args.crt:
