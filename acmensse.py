@@ -58,9 +58,10 @@ class _account_keyfile:
         """
         import os
         r, w = os.pipe()
+        os.set_inheritable(r, True)
         os.write(w, self._passin.encode("utf-8"))
         os.close(w)
-        return r, lambda:os.close(w)
+        return r
 
     def __str__(self):
         return self._keyfilepath
@@ -80,11 +81,13 @@ def _b64(b):
     return base64.urlsafe_b64encode(b).decode().replace("=", "")
 
 
-def _cmd(cmd_list, stdin=None, cmd_input=None, err_msg="Command Line Error", preexec_fn=None):
+def _cmd(cmd_list, stdin=None, cmd_input=None, err_msg="Command Line Error"):
     "Runs external commands"
     proc = subprocess.Popen(
-        cmd_list, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        preexec_fn=preexec_fn
+        cmd_list, stdin=stdin,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        close_fds=False
     )
     out, err = proc.communicate(cmd_input)
     if proc.returncode != 0:
@@ -131,15 +134,14 @@ def _mk_signed_req_body(url, payload, nonce, auth, account_key:_account_keyfile)
     protected64 = _b64(json.dumps(protected).encode("utf8"))
     protected_input = "{0}.{1}".format(protected64, payload64).encode("utf8")
     cmd = ["openssl", "dgst", "-sha256", "-sign", str(account_key)]
-    r, closeIt = account_key.passpipe()
+    r = account_key.passpipe()
     cmd.extend(account_key.passopts(r))
 
     out = _cmd(
         cmd,
         stdin=subprocess.PIPE,
         cmd_input=protected_input,
-        err_msg="OpenSSL Error",
-        preexec_fn=closeIt
+        err_msg="OpenSSL Error"
     )
     return json.dumps(
         {"protected": protected64, "payload": payload64, "signature": _b64(out)}
@@ -341,12 +343,11 @@ def sign_csr(ca_url, account_key:_account_keyfile, csr, email=None, challenge_ty
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
     cmd = ["openssl", "rsa", "-in", str(account_key), "-noout", "-text"]
-    r, closeIt = account_key.passpipe()
+    r = account_key.passpipe()
     cmd.extend(account_key.passopts(r))
     out = _cmd(
         cmd,
-        err_msg="Error reading account public key",
-        preexec_fn=closeIt
+        err_msg="Error reading account public key"
     )
     pub_hex, pub_exp = re.search(
         r"modulus:[\s]+?00:([a-f0-9\:\s]+?)\npublicExponent: ([0-9]+)",
@@ -515,13 +516,12 @@ def revoke_crt(ca_url, account_key:_account_keyfile, crt):
     # Step 1: Get account public key
     sys.stderr.write("Reading pubkey file...\n")
     cmd = ["openssl", "rsa", "-in", str(account_key), "-noout", "-text"]
-    r, closeIt = account_key.passpipe()
+    r = account_key.passpipe()
     cmd.extend(account_key.passopts(r))
 
     out = _cmd(
         cmd,
-        err_msg="Error reading account public key",
-        preexec_fn=closeIt
+        err_msg="Error reading account public key"
     )
 
     pub_hex, pub_exp = re.search(
